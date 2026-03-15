@@ -4,7 +4,7 @@ RUN apk add --no-cache ca-certificates git
 
 # Install OCB (OpenTelemetry Collector Builder)
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    go install go.opentelemetry.io/collector/cmd/builder@v0.117.0
+    go install go.opentelemetry.io/collector/cmd/builder@v0.118.0
 
 WORKDIR /build
 COPY builder-config.yaml .
