@@ -2,7 +2,6 @@ dist:
   name: otelcol-krateo
   description: Krateo OTel Collector – contrib + compositionresolver processor
   output_path: ./otelcol-krateo
-  otelcol_version: 0.117.0
 
 receivers:
   # K8s events (watch mode) and cluster metrics
