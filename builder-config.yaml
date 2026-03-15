@@ -1,0 +1,28 @@
+dist:
+  name: otelcol-krateo
+  description: Krateo OTel Collector – contrib + compositionresolver processor
+  output_path: ./otelcol-krateo
+  otelcol_version: 0.117.0
+
+receivers:
+  # K8s events (watch mode) and cluster metrics
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.117.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.117.0
+
+processors:
+  # Core processors
+  - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.117.0
+  - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.117.0
+  # Contrib processors
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.117.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.117.0
+  # Custom: resolves krateo.io/composition-id from involvedObject labels
+  - gomod: github.com/braghettos/observability-stack/otel-collector-custom/compositionresolver v0.0.1
+    path: ./compositionresolver
+
+exporters:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter v0.117.0
+  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.117.0
+
+extensions:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.117.0
