@@ -37,13 +37,16 @@ type compositionResolverProcessor struct {
 
 	cache   map[string]cacheEntry
 	cacheMu sync.RWMutex
+
+	stopEvict chan struct{}
 }
 
 func newProcessor(logger *zap.Logger, cfg *Config) *compositionResolverProcessor {
 	return &compositionResolverProcessor{
-		logger: logger,
-		config: cfg,
-		cache:  make(map[string]cacheEntry),
+		logger:    logger,
+		config:    cfg,
+		cache:     make(map[string]cacheEntry),
+		stopEvict: make(chan struct{}),
 	}
 }
 
@@ -70,11 +73,43 @@ func (p *compositionResolverProcessor) start(_ context.Context, _ component.Host
 		zap.Duration("negative_cache_ttl", p.config.NegativeCacheTTL),
 		zap.String("label_key", p.config.LabelKey))
 
+	go p.evictExpiredEntries()
+
 	return nil
 }
 
 func (p *compositionResolverProcessor) shutdown(_ context.Context) error {
+	close(p.stopEvict)
 	return nil
+}
+
+// evictExpiredEntries periodically removes expired cache entries to prevent
+// unbounded memory growth. Runs every 60 seconds until shutdown.
+func (p *compositionResolverProcessor) evictExpiredEntries() {
+	ticker := time.NewTicker(60 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			now := time.Now()
+			p.cacheMu.Lock()
+			evicted := 0
+			for uid, entry := range p.cache {
+				if now.After(entry.expiresAt) {
+					delete(p.cache, uid)
+					evicted++
+				}
+			}
+			p.cacheMu.Unlock()
+			if evicted > 0 {
+				p.logger.Debug("evicted expired cache entries",
+					zap.Int("evicted", evicted),
+					zap.Int("remaining", len(p.cache)))
+			}
+		case <-p.stopEvict:
+			return
+		}
+	}
 }
 
 // processLogs iterates over all log records and enriches K8s events with

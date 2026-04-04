@@ -1,6 +1,9 @@
 package compositionresolver
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type Config struct {
 	// CacheTTL controls how long a resolved composition-id stays cached before
@@ -19,5 +22,14 @@ type Config struct {
 }
 
 func (c *Config) Validate() error {
+	if c.CacheTTL <= 0 {
+		return fmt.Errorf("cache_ttl must be positive, got %s", c.CacheTTL)
+	}
+	if c.NegativeCacheTTL <= 0 {
+		return fmt.Errorf("negative_cache_ttl must be positive, got %s", c.NegativeCacheTTL)
+	}
+	if c.LabelKey == "" {
+		return fmt.Errorf("label_key must not be empty")
+	}
 	return nil
 }
