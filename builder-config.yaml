@@ -5,7 +5,11 @@ dist:
 
 receivers:
   # K8s events (watch mode) and cluster metrics
+  # k8sobjectsreceiver vendored locally with a krateo patch: the upstream v0.118.0 watch stalls
+  # silently (no error/close) when the watch connection dies, hanging events forever. The patched
+  # copy re-establishes the watch on a recycle interval and restarts (not stops) on channel close.
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.118.0
+    path: ./k8sobjectsreceiver
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.118.0
 
 processors:
