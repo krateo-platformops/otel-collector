@@ -24,7 +24,13 @@ processors:
     path: ./compositionresolver
 
 exporters:
+  # clickhouseexporter vendored locally with a krateo patch: on an insert failing with
+  # UNKNOWN_TABLE (code 60) -- i.e. ClickHouse was re-provisioned with a fresh, empty DB while
+  # the collector kept running -- recreate the otel_* schema (idempotent) and retry, instead of
+  # dropping telemetry until the collector is manually restarted. Upstream PR pending; when it
+  # merges + releases, drop the vendored copy + the path: override and bump the gomod version.
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/clickhouseexporter v0.118.0
+    path: ./clickhouseexporter
   - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.118.0
 
 extensions:

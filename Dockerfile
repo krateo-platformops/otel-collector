@@ -10,6 +10,7 @@ WORKDIR /build
 COPY builder-config.yaml .
 COPY compositionresolver/ compositionresolver/
 COPY k8sobjectsreceiver/ k8sobjectsreceiver/
+COPY clickhouseexporter/ clickhouseexporter/
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
