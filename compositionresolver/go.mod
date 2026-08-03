@@ -1,4 +1,4 @@
-module github.com/braghettos/observability-stack/otel-collector-custom/compositionresolver
+module github.com/krateo-platformops/otel-collector/compositionresolver
 
 go 1.23.0
 

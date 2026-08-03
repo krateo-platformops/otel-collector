@@ -7,7 +7,7 @@
 > `krateo.io/composition-id` attribute. This index is the agent entry point to the
 > **internals & runtime** view (how the collector is built; what the processor does; the
 > pipeline that flows to ClickHouse). The **deployment, CRD/config and observability-wiring**
-> view lives in the chart repo `braghettos/krateo-clickstack-chart` `docs/` (the
+> view lives in the chart repo `krateo-platformops/clickstack-chart` `docs/` (the
 > `otel-collector-deployment` chart).
 
 ## How to use this index (agents)
@@ -16,7 +16,7 @@ You are reading the docs for a SPECIFIC deployed version. Fetch every file below
 that matches the running build**, not `main`:
 
 - **image version** = the otel-collector Deployment's container image tag
-  (`ghcr.io/braghettos/krateo-otel-collector:<tag>`) → **THIS repo's** git tag. The image tag
+  (`ghcr.io/krateo-platformops/otel-collector:<tag>`) → **THIS repo's** git tag. The image tag
   equals the chart's `appVersion`. Read this repo's docs at that **image-version** tag.
 - **chart version** = `CompositionDefinition.spec.chart.version` for the clickstack chart →
   the `krateo-clickstack-chart` repo tag. Read the chart docs there.

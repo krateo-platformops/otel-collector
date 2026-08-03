@@ -70,7 +70,7 @@ between minor versions). Treat the version set as one unit.
 ## 9. The `gomod` path for the custom processor is a placeholder
 
 In `builder-config.yaml:19` the custom processor's module is
-`github.com/braghettos/observability-stack/otel-collector-custom/compositionresolver v0.0.1` (a
+`github.com/krateo-platformops/otel-collector/compositionresolver v0.0.1` (a
 legacy/placeholder path also reflected in `go.mod:1`). It builds **only** because of the
 `path: ./compositionresolver` override on the next line (`builder-config.yaml:20`), which tells OCB
 to use the local source. The `v0.0.1` is never fetched; don't try to `go get` that path.

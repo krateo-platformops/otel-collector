@@ -101,6 +101,6 @@ not pin the config). See the chart repo `docs/` for the deployed pipeline wiring
 ## What this repo does NOT contain
 
 - No runtime collector YAML (receivers/exporters endpoints, the actual pipeline ordering): that is
-  the chart's `otel-collector-deployment` config in `braghettos/krateo-clickstack-chart`.
+  the chart's `otel-collector-deployment` config in `krateo-platformops/clickstack-chart`.
 - No ClickHouse schema/DDL: owned by the ClickHouse side of ClickStack.
 - No CRDs: this component owns none (`release-tag.yaml`'s crd job no-ops here — no `make generate`).

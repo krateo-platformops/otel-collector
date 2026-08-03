@@ -22,7 +22,7 @@ k8sclusterreceiver                                                      (debug)
 ```
 
 The exact pipeline ordering and endpoints come from the **runtime collector config** in
-`braghettos/krateo-clickstack-chart` (`otel-collector-deployment`); this repo only fixes *which*
+`krateo-platformops/clickstack-chart` (`otel-collector-deployment`); this repo only fixes *which*
 components exist. The load-bearing custom behavior — the part downstream consumers depend on — is
 the `compositionresolver` stage, below.
 
