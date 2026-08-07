@@ -1,3 +1,12 @@
+---
+type: Architecture
+title: otel-collector — runtime behavior (compositionresolver)
+description: The runtime pipeline and the composition-id enrichment contract — input shape, resolution, cache lifecycle, output — traced at file:line in compositionresolver/.
+resource: ghcr.io/krateo-platformops/otel-collector
+tags: [observability, clickstack, otel, internals]
+timestamp: 2026-08-07T00:00:00Z
+---
+
 # Behavior (runtime)
 
 This document covers the runtime: the collector pipeline at a glance, then the
@@ -9,7 +18,7 @@ cache lifecycle — all traced to `compositionresolver/`.
 ## The pipeline at a glance
 
 The binary is a standard OTel Collector. Its component set (`builder-config.yaml`, see
-[architecture.md](architecture.md)) supports, for the ClickStack ingestion path:
+[overview.md](../overview.md)) supports, for the ClickStack ingestion path:
 
 ```
 receivers            processors                                         exporters
@@ -21,10 +30,12 @@ k8sclusterreceiver                                                      (debug)
 (cluster metrics)
 ```
 
-The exact pipeline ordering and endpoints come from the **runtime collector config** in
-`krateo-platformops/clickstack-chart` (`otel-collector-deployment`); this repo only fixes *which*
-components exist. The load-bearing custom behavior — the part downstream consumers depend on — is
-the `compositionresolver` stage, below.
+`k8sobjectsreceiver` and `clickhouseexporter` are the in-repo patched forks of the upstream
+v0.118.0 components (watch-stall recovery; schema recreation on `UNKNOWN_TABLE`) — deltas in
+[api.md](../api.md). The exact pipeline ordering and endpoints come from the **runtime
+collector config** in `krateo-platformops/clickstack-chart` (`otel-collector-deployment`);
+this repo only fixes *which* components exist. The load-bearing custom behavior — the part
+downstream consumers depend on — is the `compositionresolver` stage, below.
 
 What flows to ClickHouse: K8s **event log records** (enriched with `krateo.io/composition-id`
 where resolvable) via `clickhouseexporter`, and **cluster metrics** from `k8sclusterreceiver`.

@@ -1,50 +1,25 @@
-# krateo-otel-collector (code repo) — LLM doc index
-
-> krateo-otel-collector is the custom **OpenTelemetry Collector** distribution for Krateo
-> ClickStack: the telemetry → ClickHouse ingestion path. It is built with the OTel Collector
-> Builder (`builder-config.yaml`) from upstream contrib components plus one in-tree custom
-> processor, `compositionresolver`, which stamps each Kubernetes-event log record with a
-> `krateo.io/composition-id` attribute. This index is the agent entry point to the
-> **internals & runtime** view (how the collector is built; what the processor does; the
-> pipeline that flows to ClickHouse). The **deployment, CRD/config and observability-wiring**
-> view lives in the chart repo `krateo-platformops/clickstack-chart` `docs/` (the
-> `otel-collector-deployment` chart).
-
-## How to use this index (agents)
-
-You are reading the docs for a SPECIFIC deployed version. Fetch every file below **at the tag
-that matches the running build**, not `main`:
-
-- **image version** = the otel-collector Deployment's container image tag
-  (`ghcr.io/krateo-platformops/otel-collector:<tag>`) → **THIS repo's** git tag. The image tag
-  equals the chart's `appVersion`. Read this repo's docs at that **image-version** tag.
-- **chart version** = `CompositionDefinition.spec.chart.version` for the clickstack chart →
-  the `krateo-clickstack-chart` repo tag. Read the chart docs there.
-
-If something isn't in the docs, read the source at that same tag — don't guess, and don't
-trust `main` for a deployed older version.
-
-## Start here
-
-- [architecture.md](architecture.md): how the collector binary is assembled — the OCB
-  `builder-config.yaml` component set, the `compositionresolver` processor's structure
-  (factory/config/processor), where it sits in the pipeline, and what it stamps. Read first.
-
-## Internals & runtime
-
-- [behavior.md](behavior.md): the runtime receivers → processors → exporters pipeline, what
-  flows to ClickHouse, and the composition-id enrichment contract consumed downstream by
-  sse-proxy `/events`. The resolve/cache/eviction lifecycle traced at `file:line`.
-- [gotchas.md](gotchas.md): runtime pitfalls grounded in config/code — in-cluster RBAC needs,
-  the alpha stability level, log-only enrichment, negative-cache staleness, version pinning,
-  and the OpAMP/supervisor relay-config trap.
-
-## Reference (source of truth)
-
-- `builder-config.yaml` — the OCB manifest: the exact receivers/processors/exporters/extensions
-  (and versions) compiled into the binary.
-- `compositionresolver/` — the custom processor: `factory.go` (type + defaults),
-  `config.go` (typed config + `Validate`), `processor.go` (resolve + cache logic),
-  `go.mod` (k8s client-go / collector pins).
-- `Dockerfile` — the two-stage OCB build → distroless image.
-- `README.md` — product overview + build/release signposts.
+# otel-collector — LLM doc index (pinned: 1.0.2)
+# One line per file; regenerate the pin on release. Read files at the tag that matches the
+# running build: image tag ghcr.io/krateo-platformops/otel-collector:<tag> == this repo's git
+# tag == the otel-collector-deployment chart's appVersion (no v prefix). The chart-side view
+# (pipeline wiring, endpoints, RBAC) is versioned separately in krateo-platformops/clickstack-chart.
+docs/index.md: the map — what this repo is + links to the whole bundle
+docs/overview.md: how the binary is assembled — OCB manifest, two-stage Docker build, component table, the compositionresolver processor
+docs/usage.md: how the image is consumed — installer → clickstack-chart path, direct pull, local OCB build
+docs/configuration.md: the config surface this repo owns — compositionresolver keys, build-time manifest, chart boundary
+docs/api.md: the contract — composition-id attribute + the fork deltas vs upstream contrib v0.118.0
+docs/examples.md: index of the runnable examples
+docs/release.md: how a release ships — plain-semver tag → shared multi-platform image build → GHCR
+docs/log.md: curated history — forks, migrations, notable fixes
+docs/internals/behavior.md: the runtime pipeline + the composition-id enrichment contract, traced at file:line
+docs/internals/gotchas.md: pitfalls grounded in code/config — in-cluster-only, silent RBAC, logs-only, cache staleness, version pinning, OpAMP
+examples/in-cluster-events/README.md: standalone in-cluster deploy — events → compositionresolver → debug exporter
+examples/in-cluster-events/manifest.yaml: the manifest — kubectl apply -f
+# Source of truth (read at the same tag):
+builder-config.yaml: the OCB manifest — the exact receivers/processors/exporters/extensions (and versions) compiled in
+compositionresolver/processor.go: the custom processor — resolve + cache logic
+compositionresolver/config.go: typed config (cache_ttl, negative_cache_ttl, label_key) + Validate
+compositionresolver/factory.go: component type, defaults, logs-only registration (alpha)
+k8sobjectsreceiver/receiver.go: forked upstream receiver — the watch-recycle / restart-on-close krateo patch
+clickhouseexporter/recreate_schema.go: forked upstream exporter — the UNKNOWN_TABLE (code 60) detection for schema recreation
+Dockerfile: the two-stage OCB build → distroless image

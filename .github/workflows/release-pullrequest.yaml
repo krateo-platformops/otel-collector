@@ -1,0 +1,14 @@
+# PR CI: Krateo Documentation Standard conformance via the shared org reusable workflow —
+# the invariant docs/ file set, OKF frontmatter, link integrity, banned dead-org strings,
+# examples pairing. (Image build/security already run via security.yml on PRs; the release
+# build is release-tag.yaml.)
+name: release-pullrequest
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint-docs:
+    uses: krateo-platformops/.github/.github/workflows/lint-docs.yaml@main

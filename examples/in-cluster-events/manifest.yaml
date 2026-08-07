@@ -1,0 +1,147 @@
+# Standalone in-cluster deployment of the krateo otel-collector image: watches K8s events,
+# enriches them with the compositionresolver processor, prints them via the debug exporter.
+# No ClickHouse needed. See README.md for preconditions and cleanup.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: otel-collector-example
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otel-collector-example
+  namespace: otel-collector-example
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: otel-collector-example
+rules:
+  # k8sobjects receiver: watch Event objects cluster-wide.
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - get
+      - list
+      - watch
+  # compositionresolver: dynamic GET on ANY kind that can appear as an event's
+  # involvedObject (a missing permission is silent — the record passes through
+  # unenriched with only a debug log). Narrow this in production; the real
+  # ClusterRole is owned by the otel-collector-deployment chart in clickstack-chart.
+  - apiGroups:
+      - "*"
+    resources:
+      - "*"
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: otel-collector-example
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: otel-collector-example
+subjects:
+  - kind: ServiceAccount
+    name: otel-collector-example
+    namespace: otel-collector-example
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-example
+  namespace: otel-collector-example
+data:
+  # Every component named here is compiled into the image (builder-config.yaml);
+  # declaring an uncompiled type (e.g. otlp, prometheus) crashes the collector at startup.
+  config.yaml: |
+    receivers:
+      k8sobjects:
+        objects:
+          - name: events
+            mode: watch
+            group: ""
+            namespaces: []
+    processors:
+      memory_limiter:
+        check_interval: 5s
+        limit_percentage: 75
+        spike_limit_percentage: 20
+      batch:
+        timeout: 5s
+      compositionresolver:
+        cache_ttl: 5m
+        negative_cache_ttl: 30s
+        label_key: krateo.io/composition-id
+    exporters:
+      debug:
+        verbosity: detailed
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+    service:
+      extensions:
+        - health_check
+      pipelines:
+        logs:
+          receivers:
+            - k8sobjects
+          processors:
+            - memory_limiter
+            - batch
+            - compositionresolver
+          exporters:
+            - debug
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector-example
+  namespace: otel-collector-example
+  labels:
+    app: otel-collector-example
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-collector-example
+  template:
+    metadata:
+      labels:
+        app: otel-collector-example
+    spec:
+      serviceAccountName: otel-collector-example
+      containers:
+        - name: otel-collector
+          image: ghcr.io/krateo-platformops/otel-collector:1.0.2
+          args:
+            - --config
+            - /etc/otelcol/config.yaml
+          ports:
+            - name: health
+              containerPort: 13133
+          livenessProbe:
+            httpGet:
+              path: /
+              port: health
+          readinessProbe:
+            httpGet:
+              path: /
+              port: health
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/otelcol
+      volumes:
+        - name: config
+          configMap:
+            name: otel-collector-example
