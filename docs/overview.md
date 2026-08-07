@@ -66,16 +66,17 @@ config the chart supplies (declaring an uncompiled type crashes the collector at
 ```
 receivers            processors                                         exporters
 ─────────            ──────────                                         ─────────
-k8sobjectsreceiver → memorylimiter → batch → k8sattributes →           clickhouseexporter
-(K8s events,         resource → compositionresolver                    (→ ClickHouse)
+k8sobjectsreceiver → memory_limiter → k8sattributes → resource →       clickhouseexporter
+(K8s events,         compositionresolver → batch                       (→ ClickHouse)
  watch mode)                                                            debugexporter
 k8sclusterreceiver                                                      (debug)
 (cluster metrics)
 ```
 
-The exact pipeline ordering and endpoints come from the **runtime collector config** shipped
-by `clickstack-chart` (`charts/otel-collector-deployment`); this repo only fixes *which*
-components exist. What flows to ClickHouse: K8s **event log records** (enriched with
+Shown in the order the chart's default logs pipeline actually deploys it (`batch` runs
+last). The exact pipeline ordering and endpoints come from the **runtime collector config**
+shipped by `clickstack-chart` (`charts/otel-collector-deployment`); this repo only fixes
+*which* components exist. What flows to ClickHouse: K8s **event log records** (enriched with
 `krateo.io/composition-id` where resolvable) and **cluster metrics** from
 `k8sclusterreceiver`.
 

@@ -18,13 +18,14 @@ cache lifecycle — all traced to `compositionresolver/`.
 ## The pipeline at a glance
 
 The binary is a standard OTel Collector. Its component set (`builder-config.yaml`, see
-[overview.md](../overview.md)) supports, for the ClickStack ingestion path:
+[overview.md](../overview.md)) supports, for the ClickStack ingestion path (shown in the
+order the chart's default logs pipeline actually deploys it):
 
 ```
 receivers            processors                                         exporters
 ─────────            ──────────                                         ─────────
-k8sobjectsreceiver → memorylimiter → batch → k8sattributes →           clickhouseexporter
-(K8s events,         resource → compositionresolver                    (→ ClickHouse)
+k8sobjectsreceiver → memory_limiter → k8sattributes → resource →       clickhouseexporter
+(K8s events,         compositionresolver → batch                       (→ ClickHouse)
  watch mode)                                                            debugexporter
 k8sclusterreceiver                                                      (debug)
 (cluster metrics)
