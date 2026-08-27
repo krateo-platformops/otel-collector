@@ -223,6 +223,12 @@ func (p *compositionResolverProcessor) cacheResult(uid, compositionID string) {
 // resolveFromK8s fetches the involvedObject from the K8s API and reads its
 // krateo.io/composition-id label.  This mirrors what the Krateo EventRouter
 // does in labels.go → findCompositionID().
+//
+// When the involvedObject IS a composition (GVK group == composition.krateo.io)
+// and it carries no inherited composition-id label — i.e. an editor-created ROOT
+// composition — its own metadata.uid is returned as the composition-id so its
+// reconcile events stay correlatable. Installer-created children keep returning
+// the inherited label unchanged; non-composition objects are unaffected.
 func (p *compositionResolverProcessor) resolveFromK8s(ctx context.Context, ref involvedObjectRef) string {
 	gvk := parseGVK(ref.APIVersion, ref.Kind)
 
@@ -253,10 +259,15 @@ func (p *compositionResolverProcessor) resolveFromK8s(ctx context.Context, ref i
 	}
 
 	labels := obj.GetLabels()
-	if labels == nil {
-		return ""
+	id := labels[p.config.LabelKey] // labels may be nil; map index on nil map is "" (safe)
+	if id == "" && gvk.Group == "composition.krateo.io" {
+		// The event is about a composition itself and it carries no inherited
+		// composition-id label (an editor-created ROOT composition). Use its OWN
+		// uid as the composition-id so its events correlate. We patch the EVENT,
+		// never the composition object.
+		return string(obj.GetUID())
 	}
-	return labels[p.config.LabelKey]
+	return id
 }
 
 // parseGVK splits "apiVersion" (e.g. "apps/v1" or "v1") and kind into a GVK.
