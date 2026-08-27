@@ -1,0 +1,17 @@
+# Trivy vulnerability ignore file (repo root).
+# Honoured by the `security / filesystem` job (aquasecurity/trivy-action, scan-type: fs)
+# via Trivy's default TRIVY_IGNOREFILE=.trivyignore in the scan working directory.
+#
+# CVE-2026-33186 — google.golang.org/grpc gRPC-Go authorization bypass (grpc/authz),
+#   CRITICAL, installed v1.69.4, fixed in v1.79.3.
+#   TRANSITIVE dependency of all three Go submodules (compositionresolver,
+#   k8sobjectsreceiver, clickhouseexporter) via go.opentelemetry.io/collector* and
+#   k8s.io/client-go. The gRPC authz filter is NOT used by this collector.
+#   No clean bump: every grpc release that fixes this CVE (>=1.79.3) declares
+#   `go 1.24.0` and pulls go.opentelemetry.io/otel >=1.39, but the collector is built
+#   with OCB builder@v0.118.0 on golang:1.23-alpine (Dockerfile) and the framework is
+#   pinned to collector v0.118.0 — raising grpc breaks the toolchain/framework pin.
+#   Revisit and drop this entry when the collector framework (go.opentelemetry.io/
+#   collector*) is bumped to a release whose grpc floor is >=1.79.3 and the build image
+#   moves to go >=1.24.
+CVE-2026-33186
