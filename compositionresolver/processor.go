@@ -38,6 +38,12 @@ type compositionResolverProcessor struct {
 	cache   map[string]cacheEntry
 	cacheMu sync.RWMutex
 
+	// #22 — the discovery cache behind mapper is populated once and never
+	// invalidated, so a group/version minted AFTER startup can never be learned.
+	// These throttle the explicit invalidation added in resolveFromK8s.
+	resetMu         sync.Mutex
+	lastMapperReset time.Time
+
 	stopEvict chan struct{}
 }
 
@@ -229,10 +235,68 @@ func (p *compositionResolverProcessor) cacheResult(uid, compositionID string) {
 // composition — its own metadata.uid is returned as the composition-id so its
 // reconcile events stay correlatable. Installer-created children keep returning
 // the inherited label unchanged; non-composition objects are unaffected.
+// invalidateMapper drops the cached discovery information so the next
+// RESTMapping re-discovers, and reports whether it actually did.
+//
+// WHY THIS EXISTS AT ALL — the upstream self-heal cannot fire here (#22).
+// DeferredDiscoveryRESTMapper.RESTMappings retries only when the mapping misses
+// AND the discovery cache is not "fresh":
+//
+//	if len(ms) == 0 && !d.cl.Fresh() { d.Reset(); ... }
+//
+// but memCacheClient.Fresh() reports whether the cache is POPULATED AT ALL, not
+// whether it is current — its own comment says so — and cacheValid only goes
+// false in Invalidate(). So once discovery succeeds at startup Fresh() is
+// permanently true, the retry branch is dead, and nothing re-discovers for the
+// life of the process.
+//
+// That is fatal on Krateo specifically, because the served apiVersion IS the
+// chart version: every chart bump mints a new group/version. Measured on
+// krateo-057, composition event correlation went to 0% within ~10h of the pod
+// starting and stayed there for days (2,077 consecutive unlabelled events before
+// a restart, 53/53 labelled after), with no log output because both failure
+// paths are Debug and the collector runs at Info (#23).
+//
+// THROTTLED, because a reset is a full re-discovery. Events legitimately
+// reference kinds this cluster does not serve, and resetting per event would
+// turn a steady trickle of unknown kinds into a discovery storm against the
+// apiserver. The interval reuses NegativeCacheTTL — already "how long before we
+// re-check something we could not resolve" — rather than adding a knob that
+// would have to be kept in step with it.
+func (p *compositionResolverProcessor) invalidateMapper() bool {
+	rm, ok := p.mapper.(meta.ResettableRESTMapper)
+	if !ok {
+		// Defensive: every mapper this processor is wired with today IS
+		// resettable (the deferred one in start(), and meta.PriorityRESTMapper
+		// which the tests use), but the field is typed as the plain
+		// meta.RESTMapper interface, so a future substitution need not be.
+		// Report false rather than silently claiming a re-discovery happened.
+		return false
+	}
+	p.resetMu.Lock()
+	defer p.resetMu.Unlock()
+	if !p.lastMapperReset.IsZero() && time.Since(p.lastMapperReset) < p.config.NegativeCacheTTL {
+		return false
+	}
+	p.lastMapperReset = time.Now()
+	rm.Reset()
+	return true
+}
+
 func (p *compositionResolverProcessor) resolveFromK8s(ctx context.Context, ref involvedObjectRef) string {
 	gvk := parseGVK(ref.APIVersion, ref.Kind)
 
 	mapping, err := p.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil && meta.IsNoMatchError(err) && p.invalidateMapper() {
+		// The group/version may have been minted after our discovery cache was
+		// populated — re-discover once and retry. Only on a NO-MATCH: a
+		// transient discovery or network error is not evidence of staleness and
+		// must not trigger a re-discovery.
+		p.logger.Info("re-discovering API resources after a REST mapping miss",
+			zap.String("kind", ref.Kind),
+			zap.String("apiVersion", ref.APIVersion))
+		mapping, err = p.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	}
 	if err != nil {
 		p.logger.Debug("REST mapping not found",
 			zap.String("kind", ref.Kind),
