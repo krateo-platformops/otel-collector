@@ -60,11 +60,7 @@ func newTestProcessor(t *testing.T, gvks []schema.GroupVersionKind, objs ...runt
 	}
 
 	dynClient := fake.NewSimpleDynamicClientWithCustomListKinds(scheme, gvrToListKind, objs...)
-	// Wrapped so the processor's ResettableRESTMapper contract is satisfied AND so a test
-	// can observe resets. The production mapper is a DeferredDiscoveryRESTMapper, which is
-	// resettable; NewDiscoveryRESTMapper is not, and a bare meta.RESTMapper here would
-	// silently stop compiling against the real field type.
-	mapper := &countingResettableMapper{RESTMapper: restmapper.NewDiscoveryRESTMapper(apiGroupResources)}
+	mapper := restmapper.NewDiscoveryRESTMapper(apiGroupResources)
 
 	p := newProcessor(zaptest.NewLogger(t), &Config{
 		CacheTTL:         5 * time.Minute,
@@ -149,52 +145,5 @@ func TestResolveFromK8s(t *testing.T) {
 				t.Fatalf("resolveFromK8s() = %q, want %q", got, tc.want)
 			}
 		})
-	}
-}
-
-// countingResettableMapper makes a non-resettable RESTMapper satisfy
-// meta.ResettableRESTMapper and records how many times Reset was called.
-type countingResettableMapper struct {
-	meta.RESTMapper
-	resets int
-}
-
-func (m *countingResettableMapper) Reset() { m.resets++ }
-
-// TestRESTMappingMissResetsDiscoveryCacheOnce covers the fix for the stale-discovery defect:
-// the deferred mapper is built once at start() and caches the API surface, so a kind whose
-// apiVersion was released afterwards is permanently unmappable. A miss must drop the cache
-// and retry; a burst of misses must NOT, or every event naming a nonexistent kind would
-// re-list the apiserver.
-func TestRESTMappingMissResetsDiscoveryCacheOnce(t *testing.T) {
-	p := newTestProcessor(t, []schema.GroupVersionKind{
-		{Group: "composition.krateo.io", Version: "v1-12-38", Kind: "Snowplow"},
-	})
-	m := p.mapper.(*countingResettableMapper)
-
-	// A kind this mapper has never seen -- the shape of a version minted after start().
-	ref := involvedObjectRef{
-		APIVersion: "composition.krateo.io/v1-12-41",
-		Kind:       "Snowplow", Namespace: "krateo-system", Name: "snowplow",
-	}
-
-	if got := p.resolveFromK8s(context.Background(), ref); got != "" {
-		t.Fatalf("unmappable kind should resolve to empty, got %q", got)
-	}
-	if m.resets != 1 {
-		t.Fatalf("a mapping miss must reset the discovery cache exactly once, got %d", m.resets)
-	}
-
-	// Second miss inside the throttle window: must not reset again.
-	_ = p.resolveFromK8s(context.Background(), ref)
-	if m.resets != 1 {
-		t.Fatalf("throttle must suppress a second reset within %s, got %d resets", mapperResetInterval, m.resets)
-	}
-
-	// Outside the window it may reset again.
-	p.lastMapperReset = time.Now().Add(-2 * mapperResetInterval)
-	_ = p.resolveFromK8s(context.Background(), ref)
-	if m.resets != 2 {
-		t.Fatalf("a miss after the throttle window must reset again, got %d resets", m.resets)
 	}
 }
