@@ -21,12 +21,6 @@ import (
 	"k8s.io/client-go/restmapper"
 )
 
-// mapperResetInterval bounds how often a REST mapping miss may drop the discovery cache.
-// Low enough that a newly-released apiVersion becomes resolvable within a minute, high
-// enough that a stream of events naming a kind that does not exist cannot turn every one
-// of them into a full re-list of the apiserver's groups and versions.
-const mapperResetInterval = 30 * time.Second
-
 // cacheEntry stores a resolved composition-id with an expiration time.
 // An empty compositionID means the resource was resolved but had no label.
 type cacheEntry struct {
@@ -39,15 +33,7 @@ type compositionResolverProcessor struct {
 	config *Config
 
 	dynClient dynamic.Interface
-	// ResettableRESTMapper, not RESTMapper: the deferred mapper caches discovery and
-	// MUST be reset when the API surface changes. See resolveFromK8s.
-	mapper meta.ResettableRESTMapper
-
-	// lastMapperReset throttles the reset below. A kind that genuinely does not exist
-	// fails every time, and resetting per failure would re-list the whole API surface
-	// on every such event.
-	lastMapperReset time.Time
-	mapperMu        sync.Mutex
+	mapper    meta.RESTMapper
 
 	cache   map[string]cacheEntry
 	cacheMu sync.RWMutex
@@ -248,26 +234,6 @@ func (p *compositionResolverProcessor) resolveFromK8s(ctx context.Context, ref i
 
 	mapping, err := p.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
-		// The mapper is a DeferredDiscoveryRESTMapper built ONCE in start(). It caches the
-		// API surface as discovered at that moment and never refreshes itself. Krateo mints a
-		// NEW apiVersion on every component release -- a composition bump takes
-		// composition.krateo.io/v1-12-38 to v1-12-41, and four such versions appeared on a
-		// single day -- so any kind released after this collector started is permanently
-		// unmappable, and the processor silently returns "" for it forever. That is not a
-		// transient miss: without a reset it can never recover short of a pod restart.
-		//
-		// Measured before this fix: 42,580 of 42,592 resolution attempts on root compositions
-		// failed, with the fallback firing on twelve. Both failure paths log at Debug while
-		// the collector runs at Info, so the feature was silently dead rather than noisy.
-		//
-		// Reset() drops the cached discovery so the next call re-lists. It is throttled
-		// because a genuinely nonexistent kind fails every time and would otherwise re-list
-		// the entire API surface per event.
-		if p.resetMapper() {
-			mapping, err = p.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-		}
-	}
-	if err != nil {
 		p.logger.Debug("REST mapping not found",
 			zap.String("kind", ref.Kind),
 			zap.String("apiVersion", ref.APIVersion),
@@ -308,24 +274,4 @@ func (p *compositionResolverProcessor) resolveFromK8s(ctx context.Context, ref i
 func parseGVK(apiVersion, kind string) schema.GroupVersionKind {
 	gv, _ := schema.ParseGroupVersion(apiVersion)
 	return gv.WithKind(kind)
-}
-
-// resetMapper drops the deferred mapper's cached discovery so the next RESTMapping re-lists
-// the API surface, and reports whether it actually did so.
-//
-// Throttled to at most once per mapperResetInterval. A kind that does not exist fails on
-// every event, and an unthrottled reset would turn each one into a full re-list of every
-// group and version on the apiserver.
-func (p *compositionResolverProcessor) resetMapper() bool {
-	p.mapperMu.Lock()
-	defer p.mapperMu.Unlock()
-
-	if time.Since(p.lastMapperReset) < mapperResetInterval {
-		return false
-	}
-	p.lastMapperReset = time.Now()
-	p.mapper.Reset()
-	p.logger.Info("reset the discovery cache after a REST mapping miss",
-		zap.Duration("throttle", mapperResetInterval))
-	return true
 }
