@@ -1,4 +1,14 @@
-FROM golang:1.23-alpine AS builder
+# Go 1.25: compositionresolver/go.mod declares `go 1.25.0` (raised from 1.23.0 by the
+# golang.org/x/net bump in #13). GOTOOLCHAIN is local in this image, so a builder older
+# than the highest `go` directive across the three modules fails OCB's internal
+# `go mod tidy` with "requires go >= 1.25.0 (running go 1.23.12)" — which is what broke
+# the 1.0.4 release build. Keep this at or above the highest directive in
+# compositionresolver/, k8sobjectsreceiver/ and clickhouseexporter/ go.mod.
+#
+# This is invisible to PR CI: release-pullrequest runs docs lint only and security.yml
+# builds with the runner's own toolchain, so NOTHING exercises this pinned image until a
+# release tag is pushed. A dependabot bump can therefore break releases silently.
+FROM golang:1.25-alpine AS builder
 
 RUN apk add --no-cache ca-certificates git
 
