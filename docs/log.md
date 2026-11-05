@@ -11,6 +11,12 @@ timestamp: 2026-08-07T00:00:00Z
 
 Curated history, newest first. Release notes live in GitHub Releases.
 
+## 2026-11-05
+- Added `transformprocessor` so the `otel-collector-deployment` chart can redact JWTs on the
+  `k8sobjects` logs pipeline (#29, installer#394). Bodies from that receiver are nested maps,
+  which `replace_pattern(body, ...)` leaves untouched, so the chart must target `body.string`.
+  That accessor only converts a record to a string when the pattern matches.
+
 ## 2026-08-07
 - Adopted the Krateo Documentation Standard (this bundle). The former
   `docs/{architecture,behavior,gotchas}.md` were re-derived against current source:

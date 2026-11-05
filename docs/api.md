@@ -37,7 +37,7 @@ Config keys (`cache_ttl`, `negative_cache_ttl`, `label_key`):
 
 Both forks keep the **upstream module path** in `go.mod` (so the `gomod:` entry in
 `builder-config.yaml` is satisfied) and are wired in via a `path:` override
-(`builder-config.yaml:11-12`, `32-33`). Both are strict subsets of the upstream dir plus the
+(`builder-config.yaml:11-12`, `34-35`). Both are strict subsets of the upstream dir plus the
 patch: upstream test files/mocks/testdata not needed for the build were dropped from the
 receiver copy; the exporter copy keeps upstream tests and adds `recreate_schema_test.go`.
 Neither fork adds or changes any configuration key.
@@ -94,7 +94,7 @@ Everything else (SQL, models, config, factory) is identical to upstream v0.118.0
 - `clickhouseexporter`: an upstream PR is pending (the fix needs re-implementation on
   upstream's refactored `driver.Conn` main). When it merges and releases: delete the
   vendored dir, drop the `path:` override, bump the `gomod` version
-  (`builder-config.yaml:27-31` records this contract).
+  (`builder-config.yaml:29-33` records this contract).
 - `k8sobjectsreceiver`: same shape — the recycle/restart patch is upstream-able; until then
   the vendored copy must be re-diffed against upstream on every version bump (the whole
   v0.118.0 set moves as one unit — see gotcha 8 in
@@ -104,5 +104,5 @@ Everything else (SQL, models, config, factory) is identical to upstream v0.118.0
 
 Wholly Krateo-owned code (no upstream counterpart). Its module path
 `github.com/krateo-platformops/otel-collector/compositionresolver` is real, but the
-`v0.0.1` in `builder-config.yaml:23` is a never-fetched placeholder — the build uses the
+`v0.0.1` in `builder-config.yaml:25` is a never-fetched placeholder — the build uses the
 local `path:` override (`builder-config.yaml:24`).
