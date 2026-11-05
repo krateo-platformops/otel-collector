@@ -48,5 +48,5 @@ up the new chart version. Nothing in this repo self-propagates.
 ## Version-set rule
 
 An OTel version bump is never image-only: OCB (`Dockerfile:7`), every `gomod` pin in
-`builder-config.yaml`, and the three in-tree components' `go.mod`s move together, and both
+`builder-config.yaml`, and the in-tree modules' `go.mod`s move together, and both
 vendored forks must be re-diffed against the new upstream (deltas in [api.md](./api.md)).

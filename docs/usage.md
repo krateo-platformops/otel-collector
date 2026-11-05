@@ -67,5 +67,5 @@ builder --config builder-config.yaml   # emits ./otelcol-krateo/otelcol-krateo
 ```
 
 Keep the version set coherent when bumping anything — OCB, every `gomod` pin in
-`builder-config.yaml`, and the three in-tree components' `go.mod`s move together
+`builder-config.yaml`, and the in-tree modules' `go.mod`s move together
 (gotcha 8 in [internals/gotchas.md](./internals/gotchas.md)).

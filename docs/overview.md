@@ -11,7 +11,7 @@ timestamp: 2026-08-07T00:00:00Z
 
 otel-collector is **not** a hand-written service: it is a custom OpenTelemetry Collector
 binary assembled at build time by the **OTel Collector Builder (OCB)** from a declarative
-manifest, plus three in-tree components. Four artifacts define it:
+manifest, plus four in-tree modules. Five artifacts define it:
 
 1. `builder-config.yaml` — the OCB manifest listing every component compiled into the binary.
 2. `compositionresolver/` — the wholly custom logs processor (not from upstream).
@@ -20,6 +20,10 @@ manifest, plus three in-tree components. Four artifacts define it:
 4. `clickhouseexporter/` — a vendored fork of the upstream contrib exporter at v0.118.0,
    patched to recreate the `otel_*` schema on `UNKNOWN_TABLE`
    (see [api.md](./api.md#fork-clickhouseexporter)).
+5. `contribconfig/` — a vendored fork of `go.opentelemetry.io/contrib/config` at v0.10.0, patched
+   so the collector starts on a current OTel Go SDK (see [api.md](./api.md#fork-contribconfig)).
+   It is a library of the collector core, not a component, so it is wired through `replaces:` in
+   `builder-config.yaml` and has no entry in the component table.
 
 ---
 
@@ -28,8 +32,8 @@ manifest, plus three in-tree components. Four artifacts define it:
 `builder-config.yaml` is consumed by `go.opentelemetry.io/collector/cmd/builder` to generate
 and compile the `otelcol-krateo` binary. `Dockerfile` runs it in a two-stage build:
 
-- Stage 1 (`golang:1.23-alpine`, `Dockerfile:1`): installs OCB pinned at `v0.118.0`
-  (`Dockerfile:7`), copies `builder-config.yaml` and the three in-tree component dirs
+- Stage 1 (`golang:1.26-alpine`, see `Dockerfile`): installs OCB pinned at `v0.118.0`
+  (`Dockerfile:7`), copies `builder-config.yaml` and the four in-tree module dirs
   (`Dockerfile:10-13`), then runs `builder --config builder-config.yaml` (`Dockerfile:15-17`)
   which emits `./otelcol-krateo/otelcol-krateo`.
 - Stage 2 (`gcr.io/distroless/base-debian12`, `Dockerfile:20`): copies the static binary and

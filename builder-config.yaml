@@ -35,3 +35,16 @@ exporters:
 
 extensions:
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.118.0
+
+# OTel Go SDK v1.47.0 under collector core v0.118.0. These reach the module graph OCB generates, which
+# is the graph that ships. A floor in a local module's go.mod would not hold for otelzap: `go mod tidy`
+# drops a requirement a module does not use, and no local module imports it.
+# - contrib/config: vendored at v0.10.0 (the version core v0.118.0 compiles against) with a one-line
+#   patch, see contribconfig/resource.go. Unpatched, the collector exits at startup with
+#   "conflicting Schema URL" on any otel/sdk >= v1.37.0. Its go.mod also carries the OTLP and stdout
+#   exporter floors (GHSA-8wmf-6v46-5gfg, GHSA-w8rr-5gcm-pp58, GHSA-hjf4-fphr-2h65).
+# - otelzap: v0.6.0 does not compile against otel/log v1.47.0.
+# Drop both when a collector core bump brings these versions on its own.
+replaces:
+  - go.opentelemetry.io/contrib/config => ../contribconfig
+  - go.opentelemetry.io/contrib/bridges/otelzap => go.opentelemetry.io/contrib/bridges/otelzap v0.21.0
