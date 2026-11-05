@@ -12,6 +12,9 @@ timestamp: 2026-08-07T00:00:00Z
 Curated history, newest first. Release notes live in GitHub Releases.
 
 ## 2026-11-05
+- Added `.github/workflows/test.yaml`, which runs `clickhouseexporter` and `compositionresolver`
+  with `-race` and a floor on the number of tests run. Until now no workflow ran `go test`, so a
+  green commit meant the code had not been tested, and the installer's pin gate refused 1.0.5.
 - Added `transformprocessor` so the `otel-collector-deployment` chart can redact JWTs on the
   `k8sobjects` logs pipeline (#29, installer#394). Bodies from that receiver are nested maps,
   which `replace_pattern(body, ...)` leaves untouched, so the chart must target `body.string`.
