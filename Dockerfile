@@ -1,14 +1,15 @@
-# Go 1.25: compositionresolver/go.mod declares `go 1.25.0` (raised from 1.23.0 by the
-# golang.org/x/net bump in #13). GOTOOLCHAIN is local in this image, so a builder older
-# than the highest `go` directive across the three modules fails OCB's internal
-# `go mod tidy` with "requires go >= 1.25.0 (running go 1.23.12)" — which is what broke
-# the 1.0.4 release build. Keep this at or above the highest directive in
-# compositionresolver/, k8sobjectsreceiver/ and clickhouseexporter/ go.mod.
+# Go 1.26: every module here declares `go 1.26.10`. Go 1.25 is out of support (1.25.14 is its
+# last release), and the standard-library fixes that shipped in 1.26.9 and 1.26.10 never reached
+# it, so 1.25 cannot produce a clean binary. GOTOOLCHAIN is local in this image, so a builder
+# older than the highest `go` directive across the three modules fails OCB's internal
+# `go mod tidy` with "requires go >= ..."; that is what broke the 1.0.4 release build. Keep this
+# at or above the highest directive in compositionresolver/, k8sobjectsreceiver/,
+# clickhouseexporter/ and contribconfig/ go.mod.
 #
 # This is invisible to PR CI: release-pullrequest runs docs lint only and security.yml
 # builds with the runner's own toolchain, so NOTHING exercises this pinned image until a
 # release tag is pushed. A dependabot bump can therefore break releases silently.
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 RUN apk add --no-cache ca-certificates git
 
@@ -29,6 +30,7 @@ COPY builder-config.yaml .
 COPY compositionresolver/ compositionresolver/
 COPY k8sobjectsreceiver/ k8sobjectsreceiver/
 COPY clickhouseexporter/ clickhouseexporter/
+COPY contribconfig/ contribconfig/
 
 # Retry OCB up to 3× — the module cache mount means a retry re-uses everything
 # already downloaded, so a transient proxy.golang.org/sum.golang.org blip on one

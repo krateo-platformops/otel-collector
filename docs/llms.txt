@@ -22,4 +22,5 @@ compositionresolver/config.go: typed config (cache_ttl, negative_cache_ttl, labe
 compositionresolver/factory.go: component type, defaults, logs-only registration (alpha)
 k8sobjectsreceiver/receiver.go: forked upstream receiver — the watch-recycle / restart-on-close krateo patch
 clickhouseexporter/recreate_schema.go: forked upstream exporter — the UNKNOWN_TABLE (code 60) detection for schema recreation
+contribconfig/resource.go: forked contrib/config v0.10.0 — the one-line patch that lets the collector start on a current OTel Go SDK
 Dockerfile: the two-stage OCB build → distroless image

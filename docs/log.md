@@ -11,6 +11,14 @@ timestamp: 2026-08-07T00:00:00Z
 
 Curated history, newest first. Release notes live in GitHub Releases.
 
+## 2026-11-05
+- Dependency update under collector core v0.118.0: grpc v1.83.2, OTel Go SDK v1.47.0, clickhouse-go
+  v2.34.0, x/net v0.62.0, Go 1.26. Vendored `go.opentelemetry.io/contrib/config` as `contribconfig/`
+  with a one-line patch, because the SDK bump otherwise exits at startup
+  ([api.md](./api.md#fork-contribconfig)). Dropped the `go.mod` `replace` directives into
+  `../../` paths that do not exist in this repo: they made `go mod download` fail, which turned
+  `security / go` red for both forks on main.
+
 ## 2026-08-07
 - Adopted the Krateo Documentation Standard (this bundle). The former
   `docs/{architecture,behavior,gotchas}.md` were re-derived against current source:
