@@ -55,9 +55,10 @@ config the chart supplies (declaring an uncompiled type crashes the collector at
 | processor | `k8sattributesprocessor` | `builder-config.yaml:20` | enrich with K8s metadata |
 | processor | `resourceprocessor` | `builder-config.yaml:21` | resource attribute edits |
 | processor | `transformprocessor` | `builder-config.yaml:23` | OTTL statements; the chart uses it for JWT redaction |
-| **processor** | **`compositionresolver`** | **`builder-config.yaml:25-26` (local `./compositionresolver`)** | **custom: stamps `krateo.io/composition-id`** |
-| exporter | `clickhouseexporter` | `builder-config.yaml:34-35` (local `./clickhouseexporter`) | the ingestion sink → ClickHouse — **krateo-patched fork** |
-| exporter | `debugexporter` | `builder-config.yaml:36` | debug/stdout |
+| processor | `filterprocessor` | `builder-config.yaml:24` | OTTL drop conditions; the chart drops `k8s.container.ready` for Job-owned pods |
+| **processor** | **`compositionresolver`** | **`builder-config.yaml:26-27` (local `./compositionresolver`)** | **custom: stamps `krateo.io/composition-id`** |
+| exporter | `clickhouseexporter` | `builder-config.yaml:35-36` (local `./clickhouseexporter`) | the ingestion sink → ClickHouse — **krateo-patched fork** |
+| exporter | `debugexporter` | `builder-config.yaml:37` | debug/stdout |
 | extension | `healthcheckextension` | `builder-config.yaml:39` | health endpoint |
 
 ---

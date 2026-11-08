@@ -11,6 +11,13 @@ timestamp: 2026-08-07T00:00:00Z
 
 Curated history, newest first. Release notes live in GitHub Releases.
 
+## 2026-11-08
+- Added `filterprocessor` so the `otel-collector-deployment` chart can drop `k8s.container.ready` for
+  Job-owned pods. A completed Job's pod reads not-ready for as long as the pod object exists, which
+  would fire a per-pod "not Ready" alert on every finished CronJob run (observability, per-pod
+  readiness alert). The chart finds Job ownership with a narrow `k8sattributes` instance that adds
+  only `k8s.job.name`.
+
 ## 2026-11-05
 - Added `.github/workflows/test.yaml`, which runs `clickhouseexporter` and `compositionresolver`
   with `-race` and a floor on the number of tests run. Until now no workflow ran `go test`, so a

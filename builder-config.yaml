@@ -21,6 +21,7 @@ processors:
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.118.0
   # JWT redaction on the k8sobjects logs pipeline, which is otherwise unredacted (#29, installer#394)
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.118.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.118.0
   # Custom: resolves krateo.io/composition-id from involvedObject labels
   - gomod: github.com/krateo-platformops/otel-collector/compositionresolver v0.0.1
     path: ./compositionresolver
