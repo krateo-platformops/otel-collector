@@ -23,7 +23,16 @@ Enriched **log records** (K8s events) carry the attribute
 the Composition resource's UID (`compositionresolver/config.go:19-21`). Absence of the
 attribute means "not attributable to a composition" (no label, unmapped kind, GET failure,
 non-event record) — never an error, and never an empty string
-(`processor.go:159-161` stamps only non-empty results). Downstream consumers — ClickHouse
+(`processor.go:179-181` stamps only non-empty results).
+
+Alongside the id, since 1.0.8, the record carries `krateo.io/composition-name` and
+`krateo.io/composition-namespace`: the composition's `metadata.name`/`metadata.namespace`, so a
+consumer can link to `/compositions/<namespace>/<name>` without listing compositions. They come
+from the same source as the id (`processor.go:358-377`): the involvedObject's
+`krateo.io/composition-name`/`-namespace` labels when the id came from its label, the object's
+own metadata when the involvedObject is a root composition whose id is its own uid. Each is
+written only when the id is and only when non-empty (`processor.go:186-192`), so a record can
+carry the id without them; it never carries them without the id. Downstream consumers — ClickHouse
 queries and **sse-proxy `/events`** — key on this attribute. Metrics and traces are **not**
 enriched (logs-only processor, `factory.go:19`). Full lifecycle:
 [internals/behavior.md](./internals/behavior.md).

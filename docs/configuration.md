@@ -20,15 +20,20 @@ Two layers of configuration exist; this repo owns only the first:
 ## `compositionresolver` processor keys
 
 The only custom runtime config surface defined in this repo (`compositionresolver/config.go`).
-Strict-unmarshal: any key beyond these three is rejected at collector startup.
+Strict-unmarshal: any key beyond these five is rejected at collector startup, so a chart that
+sets `name_label_key`/`namespace_label_key` needs image 1.0.8 or later.
 
 | Key | Type | Default | Source | Effect |
 |---|---|---|---|---|
 | `cache_ttl` | duration | `5m` | `config.go:12`, default `factory.go:25` | How long a resolved composition-id is cached per involvedObject UID before re-querying the API. Longer = less API pressure, slower label-change pickup. |
 | `negative_cache_ttl` | duration | `30s` | `config.go:17`, default `factory.go:26` | TTL for "resolved but no label / unresolvable" results — shorter so a freshly-labeled object is picked up sooner. |
 | `label_key` | string | `krateo.io/composition-id` | `config.go:21`, default `factory.go:27` | The Kubernetes label read from the involvedObject **and** the attribute key stamped on the log record. |
+| `name_label_key` | string | `krateo.io/composition-name` | `config.go:26`, default `factory.go:28` | The label holding the composition's `metadata.name`, and the attribute it is stamped under. Empty disables the attribute. |
+| `namespace_label_key` | string | `krateo.io/composition-namespace` | `config.go:31`, default `factory.go:29` | The label holding the composition's `metadata.namespace`, and the attribute it is stamped under. Empty disables the attribute. |
 
-Validation (`config.go:24-35`): both TTLs must be positive; `label_key` must be non-empty.
+Validation (`config.go:34-53`): both TTLs must be positive; `label_key` must be non-empty;
+a non-empty `name_label_key`/`namespace_label_key` must differ from the other two keys, since all
+three name attributes on the same record.
 The processor is registered at **alpha** stability (`factory.go:19`).
 
 The chart's default runtime config sets exactly the defaults above (visible in the
