@@ -11,6 +11,15 @@ timestamp: 2026-08-07T00:00:00Z
 
 Curated history, newest first. Release notes live in GitHub Releases.
 
+## 2026-11-10
+- `compositionresolver` also stamps `krateo.io/composition-name` and
+  `krateo.io/composition-namespace` next to the id (new keys `name_label_key`,
+  `namespace_label_key`; empty disables). They come from the same source as the id: the
+  involvedObject's labels, or a root composition's own metadata. Compositions are named at the
+  source, so the portal's events bell can link to `/compositions/<ns>/<name>` without listing
+  every composition kind to map an id to a name. On krateo-057 every live object carrying a
+  composition-id label also carries both labels.
+
 ## 2026-11-08
 - Added `filterprocessor` so the `otel-collector-deployment` chart can drop `k8s.container.ready` for
   Job-owned pods. A completed Job's pod reads not-ready for as long as the pod object exists, which

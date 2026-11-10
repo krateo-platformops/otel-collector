@@ -22,9 +22,11 @@ func NewFactory() processor.Factory {
 
 func createDefaultConfig() component.Config {
 	return &Config{
-		CacheTTL:         5 * time.Minute,
-		NegativeCacheTTL: 30 * time.Second,
-		LabelKey:         "krateo.io/composition-id",
+		CacheTTL:          5 * time.Minute,
+		NegativeCacheTTL:  30 * time.Second,
+		LabelKey:          "krateo.io/composition-id",
+		NameLabelKey:      "krateo.io/composition-name",
+		NamespaceLabelKey: "krateo.io/composition-namespace",
 	}
 }
 

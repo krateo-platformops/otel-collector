@@ -19,6 +19,16 @@ type Config struct {
 	// LabelKey is the Kubernetes label on the involvedObject that holds the
 	// composition identifier (the composition resource's UID).
 	LabelKey string `mapstructure:"label_key"`
+
+	// NameLabelKey is the label on the involvedObject that holds the
+	// composition's metadata.name, and the attribute the name is written to.
+	// Empty disables the attribute.
+	NameLabelKey string `mapstructure:"name_label_key"`
+
+	// NamespaceLabelKey is the label on the involvedObject that holds the
+	// composition's metadata.namespace, and the attribute the namespace is
+	// written to. Empty disables the attribute.
+	NamespaceLabelKey string `mapstructure:"namespace_label_key"`
 }
 
 func (c *Config) Validate() error {
@@ -30,6 +40,14 @@ func (c *Config) Validate() error {
 	}
 	if c.LabelKey == "" {
 		return fmt.Errorf("label_key must not be empty")
+	}
+	// Each key names an attribute on the same record, so two equal keys would
+	// silently overwrite one value with another.
+	if c.NameLabelKey != "" && (c.NameLabelKey == c.LabelKey || c.NameLabelKey == c.NamespaceLabelKey) {
+		return fmt.Errorf("name_label_key %q must differ from label_key and namespace_label_key", c.NameLabelKey)
+	}
+	if c.NamespaceLabelKey != "" && c.NamespaceLabelKey == c.LabelKey {
+		return fmt.Errorf("namespace_label_key %q must differ from label_key", c.NamespaceLabelKey)
 	}
 	return nil
 }

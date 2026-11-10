@@ -33,8 +33,8 @@ jobs:
             observed: 131
             floor: 110
           - module: compositionresolver
-            observed: 10
-            floor: 8
+            observed: 19
+            floor: 16
     defaults:
       run:
         working-directory: ${{ matrix.module }}

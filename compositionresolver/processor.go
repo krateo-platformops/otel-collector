@@ -21,11 +21,22 @@ import (
 	"k8s.io/client-go/restmapper"
 )
 
-// cacheEntry stores a resolved composition-id with an expiration time.
-// An empty compositionID means the resource was resolved but had no label.
+// resolution is what one involvedObject resolves to: the composition it belongs
+// to. id empty means "not attributable to a composition"; name and namespace are
+// meaningful only alongside an id, and either may be empty on its own (an object
+// labelled with the id but not the name/namespace). Empty fields are never
+// written as attributes.
+type resolution struct {
+	id        string
+	name      string
+	namespace string
+}
+
+// cacheEntry stores a resolution with an expiration time. An empty id means the
+// resource was resolved but had no label, or could not be resolved at all.
 type cacheEntry struct {
-	compositionID string
-	expiresAt     time.Time
+	res       resolution
+	expiresAt time.Time
 }
 
 type compositionResolverProcessor struct {
@@ -77,7 +88,9 @@ func (p *compositionResolverProcessor) start(_ context.Context, _ component.Host
 	p.logger.Info("compositionresolver processor started",
 		zap.Duration("cache_ttl", p.config.CacheTTL),
 		zap.Duration("negative_cache_ttl", p.config.NegativeCacheTTL),
-		zap.String("label_key", p.config.LabelKey))
+		zap.String("label_key", p.config.LabelKey),
+		zap.String("name_label_key", p.config.NameLabelKey),
+		zap.String("namespace_label_key", p.config.NamespaceLabelKey))
 
 	go p.evictExpiredEntries()
 
@@ -118,8 +131,9 @@ func (p *compositionResolverProcessor) evictExpiredEntries() {
 	}
 }
 
-// processLogs iterates over all log records and enriches K8s events with
-// the krateo.io/composition-id attribute resolved from the involvedObject.
+// processLogs iterates over all log records and enriches K8s events with the
+// krateo.io/composition-id attribute resolved from the involvedObject, and the
+// composition's name and namespace where known.
 func (p *compositionResolverProcessor) processLogs(ctx context.Context, ld plog.Logs) (plog.Logs, error) {
 	for i := 0; i < ld.ResourceLogs().Len(); i++ {
 		rl := ld.ResourceLogs().At(i)
@@ -156,14 +170,25 @@ func (p *compositionResolverProcessor) enrichLogRecord(ctx context.Context, lr p
 		return
 	}
 
-	compositionID, found := p.lookupCached(ref.UID)
+	res, found := p.lookupCached(ref.UID)
 	if !found {
-		compositionID = p.resolveFromK8s(ctx, ref)
-		p.cacheResult(ref.UID, compositionID)
+		res = p.resolveFromK8s(ctx, ref)
+		p.cacheResult(ref.UID, res)
 	}
 
-	if compositionID != "" {
-		lr.Attributes().PutStr(p.config.LabelKey, compositionID)
+	if res.id == "" {
+		return
+	}
+	attrs := lr.Attributes()
+	attrs.PutStr(p.config.LabelKey, res.id)
+	// Name and namespace are written only when known AND their key is
+	// configured: an empty key disables that attribute, and an empty value is
+	// absent, never "" — the same rule the id has always followed.
+	if p.config.NameLabelKey != "" && res.name != "" {
+		attrs.PutStr(p.config.NameLabelKey, res.name)
+	}
+	if p.config.NamespaceLabelKey != "" && res.namespace != "" {
+		attrs.PutStr(p.config.NamespaceLabelKey, res.namespace)
 	}
 }
 
@@ -198,43 +223,34 @@ func (p *compositionResolverProcessor) extractInvolvedObject(lr plog.LogRecord) 
 	return ref, true
 }
 
-func (p *compositionResolverProcessor) lookupCached(uid string) (string, bool) {
+func (p *compositionResolverProcessor) lookupCached(uid string) (resolution, bool) {
 	p.cacheMu.RLock()
 	defer p.cacheMu.RUnlock()
 
 	entry, ok := p.cache[uid]
 	if !ok {
-		return "", false
+		return resolution{}, false
 	}
 	if time.Now().After(entry.expiresAt) {
-		return "", false
+		return resolution{}, false
 	}
-	return entry.compositionID, true
+	return entry.res, true
 }
 
-func (p *compositionResolverProcessor) cacheResult(uid, compositionID string) {
+func (p *compositionResolverProcessor) cacheResult(uid string, res resolution) {
 	ttl := p.config.CacheTTL
-	if compositionID == "" {
+	if res.id == "" {
 		ttl = p.config.NegativeCacheTTL
 	}
 
 	p.cacheMu.Lock()
 	defer p.cacheMu.Unlock()
 	p.cache[uid] = cacheEntry{
-		compositionID: compositionID,
-		expiresAt:     time.Now().Add(ttl),
+		res:       res,
+		expiresAt: time.Now().Add(ttl),
 	}
 }
 
-// resolveFromK8s fetches the involvedObject from the K8s API and reads its
-// krateo.io/composition-id label.  This mirrors what the Krateo EventRouter
-// does in labels.go → findCompositionID().
-//
-// When the involvedObject IS a composition (GVK group == composition.krateo.io)
-// and it carries no inherited composition-id label — i.e. an editor-created ROOT
-// composition — its own metadata.uid is returned as the composition-id so its
-// reconcile events stay correlatable. Installer-created children keep returning
-// the inherited label unchanged; non-composition objects are unaffected.
 // invalidateMapper drops the cached discovery information so the next
 // RESTMapping re-discovers, and reports whether it actually did.
 //
@@ -283,7 +299,23 @@ func (p *compositionResolverProcessor) invalidateMapper() bool {
 	return true
 }
 
-func (p *compositionResolverProcessor) resolveFromK8s(ctx context.Context, ref involvedObjectRef) string {
+// resolveFromK8s fetches the involvedObject from the K8s API and reads its
+// krateo.io/composition-id label.  This mirrors what the Krateo EventRouter
+// does in labels.go → findCompositionID().
+//
+// When the involvedObject IS a composition (GVK group == composition.krateo.io)
+// and it carries no inherited composition-id label — i.e. an editor-created ROOT
+// composition — its own metadata.uid is returned as the composition-id so its
+// reconcile events stay correlatable. Installer-created children keep returning
+// the inherited label unchanged; non-composition objects are unaffected.
+//
+// Name and namespace always come from the SAME source as the id, so the three
+// describe one composition: from the composition-name/-namespace labels when the
+// id came from the label, from the object's own metadata when the id is the
+// object's own uid. Mixing sources would be wrong for an installer child: its
+// label id names the installer composition, while its own metadata names the
+// child.
+func (p *compositionResolverProcessor) resolveFromK8s(ctx context.Context, ref involvedObjectRef) resolution {
 	gvk := parseGVK(ref.APIVersion, ref.Kind)
 
 	mapping, err := p.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
@@ -302,7 +334,7 @@ func (p *compositionResolverProcessor) resolveFromK8s(ctx context.Context, ref i
 			zap.String("kind", ref.Kind),
 			zap.String("apiVersion", ref.APIVersion),
 			zap.Error(err))
-		return ""
+		return resolution{}
 	}
 
 	var ri dynamic.ResourceInterface
@@ -319,19 +351,31 @@ func (p *compositionResolverProcessor) resolveFromK8s(ctx context.Context, ref i
 			zap.String("name", ref.Name),
 			zap.String("namespace", ref.Namespace),
 			zap.Error(err))
-		return ""
+		return resolution{}
 	}
 
-	labels := obj.GetLabels()
-	id := labels[p.config.LabelKey] // labels may be nil; map index on nil map is "" (safe)
-	if id == "" && gvk.Group == "composition.krateo.io" {
+	labels := obj.GetLabels() // may be nil; indexing a nil map yields "" (safe)
+	if id := labels[p.config.LabelKey]; id != "" {
+		// A disabled (empty) name/namespace key indexes as "" too: Kubernetes
+		// rejects an empty label key, so no object carries one.
+		return resolution{
+			id:        id,
+			name:      labels[p.config.NameLabelKey],
+			namespace: labels[p.config.NamespaceLabelKey],
+		}
+	}
+	if gvk.Group == "composition.krateo.io" {
 		// The event is about a composition itself and it carries no inherited
 		// composition-id label (an editor-created ROOT composition). Use its OWN
-		// uid as the composition-id so its events correlate. We patch the EVENT,
-		// never the composition object.
-		return string(obj.GetUID())
+		// uid as the composition-id so its events correlate, and its own name and
+		// namespace alongside it. We patch the EVENT, never the composition object.
+		return resolution{
+			id:        string(obj.GetUID()),
+			name:      obj.GetName(),
+			namespace: obj.GetNamespace(),
+		}
 	}
-	return id
+	return resolution{}
 }
 
 // parseGVK splits "apiVersion" (e.g. "apps/v1" or "v1") and kind into a GVK.

@@ -116,9 +116,9 @@ func TestResolveFromK8s_RetriesThroughTheProductionPath(t *testing.T) {
 	}
 	// The object carries no inherited label, so the f13d05b root fallback
 	// returns its own uid. Getting it proves the retry reached the GET.
-	if got != "root-uid-1" {
-		t.Errorf("resolveFromK8s = %q, want \"root-uid-1\" — without the retry the mapping "+
-			"stays missed and this returns empty, which is the #22 outage", got)
+	if got.id != "root-uid-1" {
+		t.Errorf("resolveFromK8s id = %q, want \"root-uid-1\" — without the retry the mapping "+
+			"stays missed and this returns empty, which is the #22 outage", got.id)
 	}
 }
 
@@ -167,8 +167,8 @@ func TestResolveFromK8s_DoesNotRediscoverOnTransientError(t *testing.T) {
 		APIVersion: "composition.krateo.io/v1-8-67", Kind: "BuilderPublish",
 		Name: "x", Namespace: "krateo-system", UID: "u",
 	})
-	if got != "" {
-		t.Errorf("resolveFromK8s = %q, want empty on a failed mapping", got)
+	if got != (resolution{}) {
+		t.Errorf("resolveFromK8s = %+v, want empty on a failed mapping", got)
 	}
 	if m.resets != 0 {
 		t.Errorf("resets = %d, want 0 — a transient error must NOT trigger re-discovery", m.resets)

@@ -100,16 +100,18 @@ It is a standard OTel processor split across three files:
 - `NewFactory` registers it as a **logs** processor at `StabilityLevelAlpha`
   (`factory.go:15-21`).
 - `createDefaultConfig` (`factory.go:23-29`) sets the defaults: `CacheTTL = 5m`,
-  `NegativeCacheTTL = 30s`, `LabelKey = "krateo.io/composition-id"`.
+  `NegativeCacheTTL = 30s`, `LabelKey = "krateo.io/composition-id"`,
+  `NameLabelKey = "krateo.io/composition-name"`,
+  `NamespaceLabelKey = "krateo.io/composition-namespace"`.
 - `createLogsProcessor` (`factory.go:31-45`) wraps the processor with
   `processorhelper.NewLogs`, wiring `processLogs` as the consume hook and `start`/`shutdown`
   as lifecycle hooks.
 
 ### `config.go` — typed config + validation
 
-`Config` (`config.go:8-22`) exposes three mapstructure keys — `cache_ttl`,
-`negative_cache_ttl`, `label_key`. `Validate` (`config.go:24-35`) rejects non-positive TTLs
-and an empty `label_key`.
+`Config` (`config.go:8-32`) exposes five mapstructure keys — `cache_ttl`,
+`negative_cache_ttl`, `label_key`, `name_label_key`, `namespace_label_key`. `Validate`
+(`config.go:34-53`) rejects non-positive TTLs, an empty `label_key`, and colliding keys.
 
 ### `processor.go` — resolve + cache
 
