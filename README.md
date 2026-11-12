@@ -7,7 +7,7 @@ from upstream contrib components plus three in-tree Krateo components.
 
 A **source repo** (image, no charts): the OTel Collector Builder assembles `otelcol-krateo` from
 `builder-config.yaml` — upstream contrib components plus the custom `compositionresolver`
-processor (stamps `krateo.io/composition-id` on K8s-event log records) and two patched forks,
+processor (stamps `krateo.io/composition-id`, and the composition's name and namespace, on K8s-event log records) and two patched forks,
 `k8sobjectsreceiver` (watch-stall recovery) and `clickhouseexporter` (schema recreation on
 `UNKNOWN_TABLE`), plus a patched `contrib/config` library (`contribconfig`). Deployed by the `otel-collector-deployment` chart in
 [`clickstack-chart`](https://github.com/krateo-platformops/clickstack-chart).
@@ -35,6 +35,8 @@ See [docs/configuration.md](docs/configuration.md). The config this repo owns
 | `cache_ttl` | `5m` | TTL for resolved composition-ids (API-pressure vs label-change staleness). |
 | `negative_cache_ttl` | `30s` | TTL for "no label / unresolvable" results — re-checked sooner. |
 | `label_key` | `krateo.io/composition-id` | The label read from the involvedObject and the attribute stamped. |
+| `name_label_key` | `krateo.io/composition-name` | The composition's name: label read and attribute stamped. Empty disables it. |
+| `namespace_label_key` | `krateo.io/composition-namespace` | The composition's namespace: label read and attribute stamped. Empty disables it. |
 
 ## Examples
 

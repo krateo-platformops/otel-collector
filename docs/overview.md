@@ -58,10 +58,12 @@ config the chart supplies (declaring an uncompiled type crashes the collector at
 | processor | `memorylimiterprocessor` | `builder-config.yaml:18` | memory back-pressure |
 | processor | `k8sattributesprocessor` | `builder-config.yaml:20` | enrich with K8s metadata |
 | processor | `resourceprocessor` | `builder-config.yaml:21` | resource attribute edits |
-| **processor** | **`compositionresolver`** | **`builder-config.yaml:23-24` (local `./compositionresolver`)** | **custom: stamps `krateo.io/composition-id`** |
-| exporter | `clickhouseexporter` | `builder-config.yaml:32-33` (local `./clickhouseexporter`) | the ingestion sink → ClickHouse — **krateo-patched fork** |
-| exporter | `debugexporter` | `builder-config.yaml:34` | debug/stdout |
-| extension | `healthcheckextension` | `builder-config.yaml:37` | health endpoint |
+| processor | `transformprocessor` | `builder-config.yaml:23` | OTTL statements; the chart uses it for JWT redaction |
+| processor | `filterprocessor` | `builder-config.yaml:24` | OTTL drop conditions; the chart drops `k8s.container.ready` for Job-owned pods |
+| **processor** | **`compositionresolver`** | **`builder-config.yaml:26-27` (local `./compositionresolver`)** | **custom: stamps `krateo.io/composition-id`** |
+| exporter | `clickhouseexporter` | `builder-config.yaml:35-36` (local `./clickhouseexporter`) | the ingestion sink → ClickHouse — **krateo-patched fork** |
+| exporter | `debugexporter` | `builder-config.yaml:37` | debug/stdout |
+| extension | `healthcheckextension` | `builder-config.yaml:39` | health endpoint |
 
 ---
 
@@ -71,7 +73,7 @@ config the chart supplies (declaring an uncompiled type crashes the collector at
 receivers            processors                                         exporters
 ─────────            ──────────                                         ─────────
 k8sobjectsreceiver → memory_limiter → k8sattributes → resource →       clickhouseexporter
-(K8s events,         compositionresolver → batch                       (→ ClickHouse)
+(K8s events,         compositionresolver → transform → batch           (→ ClickHouse)
  watch mode)                                                            debugexporter
 k8sclusterreceiver                                                      (debug)
 (cluster metrics)
@@ -102,16 +104,18 @@ It is a standard OTel processor split across three files:
 - `NewFactory` registers it as a **logs** processor at `StabilityLevelAlpha`
   (`factory.go:15-21`).
 - `createDefaultConfig` (`factory.go:23-29`) sets the defaults: `CacheTTL = 5m`,
-  `NegativeCacheTTL = 30s`, `LabelKey = "krateo.io/composition-id"`.
+  `NegativeCacheTTL = 30s`, `LabelKey = "krateo.io/composition-id"`,
+  `NameLabelKey = "krateo.io/composition-name"`,
+  `NamespaceLabelKey = "krateo.io/composition-namespace"`.
 - `createLogsProcessor` (`factory.go:31-45`) wraps the processor with
   `processorhelper.NewLogs`, wiring `processLogs` as the consume hook and `start`/`shutdown`
   as lifecycle hooks.
 
 ### `config.go` — typed config + validation
 
-`Config` (`config.go:8-22`) exposes three mapstructure keys — `cache_ttl`,
-`negative_cache_ttl`, `label_key`. `Validate` (`config.go:24-35`) rejects non-positive TTLs
-and an empty `label_key`.
+`Config` (`config.go:8-32`) exposes five mapstructure keys — `cache_ttl`,
+`negative_cache_ttl`, `label_key`, `name_label_key`, `namespace_label_key`. `Validate`
+(`config.go:34-53`) rejects non-positive TTLs, an empty `label_key`, and colliding keys.
 
 ### `processor.go` — resolve + cache
 

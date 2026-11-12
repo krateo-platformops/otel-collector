@@ -23,7 +23,16 @@ Enriched **log records** (K8s events) carry the attribute
 the Composition resource's UID (`compositionresolver/config.go:19-21`). Absence of the
 attribute means "not attributable to a composition" (no label, unmapped kind, GET failure,
 non-event record) — never an error, and never an empty string
-(`processor.go:159-161` stamps only non-empty results). Downstream consumers — ClickHouse
+(`processor.go:179-181` stamps only non-empty results).
+
+Alongside the id, since 1.0.8, the record carries `krateo.io/composition-name` and
+`krateo.io/composition-namespace`: the composition's `metadata.name`/`metadata.namespace`, so a
+consumer can link to `/compositions/<namespace>/<name>` without listing compositions. They come
+from the same source as the id (`processor.go:358-377`): the involvedObject's
+`krateo.io/composition-name`/`-namespace` labels when the id came from its label, the object's
+own metadata when the involvedObject is a root composition whose id is its own uid. Each is
+written only when the id is and only when non-empty (`processor.go:186-192`), so a record can
+carry the id without them; it never carries them without the id. Downstream consumers — ClickHouse
 queries and **sse-proxy `/events`** — key on this attribute. Metrics and traces are **not**
 enriched (logs-only processor, `factory.go:19`). Full lifecycle:
 [internals/behavior.md](./internals/behavior.md).
@@ -37,7 +46,7 @@ Config keys (`cache_ttl`, `negative_cache_ttl`, `label_key`):
 
 Both forks keep the **upstream module path** in `go.mod` (so the `gomod:` entry in
 `builder-config.yaml` is satisfied) and are wired in via a `path:` override
-(`builder-config.yaml:11-12`, `32-33`). Both are strict subsets of the upstream dir plus the
+(`builder-config.yaml:11-12`, `34-35`). Both are strict subsets of the upstream dir plus the
 patch: upstream test files/mocks/testdata not needed for the build were dropped from the
 receiver copy; the exporter copy keeps upstream tests and adds `recreate_schema_test.go`.
 Neither fork adds or changes any configuration key.
@@ -108,7 +117,7 @@ upstream are vendored, and everything else is identical to upstream v0.10.0 apar
 - `clickhouseexporter`: an upstream PR is pending (the fix needs re-implementation on
   upstream's refactored `driver.Conn` main). When it merges and releases: delete the
   vendored dir, drop the `path:` override, bump the `gomod` version
-  (`builder-config.yaml:27-31` records this contract).
+  (`builder-config.yaml:30-34` records this contract).
 - `contribconfig`: delete the dir and its `replaces:` entry on the first collector core bump;
   newer core versions do not use this module.
 - `k8sobjectsreceiver`: same shape — the recycle/restart patch is upstream-able; until then
@@ -120,5 +129,5 @@ upstream are vendored, and everything else is identical to upstream v0.10.0 apar
 
 Wholly Krateo-owned code (no upstream counterpart). Its module path
 `github.com/krateo-platformops/otel-collector/compositionresolver` is real, but the
-`v0.0.1` in `builder-config.yaml:23` is a never-fetched placeholder — the build uses the
+`v0.0.1` in `builder-config.yaml:25` is a never-fetched placeholder — the build uses the
 local `path:` override (`builder-config.yaml:24`).

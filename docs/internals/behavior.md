@@ -72,8 +72,12 @@ the `involvedObject` it concerns.
    (`processor.go:154-157`).
 4. If a non-empty composition-id was resolved, stamp it as an attribute under
    `Config.LabelKey` (default `krateo.io/composition-id`) via
-   `lr.Attributes().PutStr(...)` (`processor.go:159-161`). An empty result stamps **nothing** —
+   `lr.Attributes().PutStr(...)` (`processor.go:179-183`). An empty result stamps **nothing** —
    the attribute is simply absent, never set to `""`.
+5. With the id, stamp the composition's name under `Config.NameLabelKey` (default
+   `krateo.io/composition-name`) and its namespace under `Config.NamespaceLabelKey` (default
+   `krateo.io/composition-namespace`), each only if its key is non-empty and its value is known
+   (`processor.go:184-192`).
 
 `resolveFromK8s` (`processor.go:226-260`):
 
@@ -82,7 +86,15 @@ the `involvedObject` it concerns.
   `""` (`processor.go:230-236`).
 - GET the object with the dynamic client, namespaced or cluster-scoped per the mapping's scope
   (`processor.go:238-253`).
-- Read the object's labels and return `labels[LabelKey]` (`processor.go:255-259`).
+- Read the object's labels. With a non-empty `labels[LabelKey]`, return it as the id, with
+  `labels[NameLabelKey]` and `labels[NamespaceLabelKey]` as name and namespace
+  (`processor.go:357-366`). This includes an installer child composition, whose inherited labels
+  name the installer.
+- Otherwise, if the object is itself a composition (`composition.krateo.io` group), return its
+  own `metadata.uid`, `metadata.name` and `metadata.namespace` (`processor.go:367-377`): an
+  editor-created root composition. Name and namespace always come from the same source as the
+  id, so the three describe one composition.
+- Otherwise return nothing.
 
 > The code comment at `processor.go:223-225` notes this mirrors what the Krateo EventRouter does in
 > `labels.go → findCompositionID()` — same label, resolved from the involvedObject.
@@ -106,7 +118,8 @@ The cache (`map[string]cacheEntry` keyed by involvedObject UID, `processor.go:38
 ### Output contract (what downstream gets)
 
 Enriched **log records** carry an attribute `krateo.io/composition-id = <the object's label value>`
-when resolvable. The label value is the Composition resource's UID (per `config.go:19-21`).
+when resolvable, plus `krateo.io/composition-name` and `krateo.io/composition-namespace` when
+known (see step 5 above). The label value is the Composition resource's UID (per `config.go:19-21`).
 Consumers — ClickHouse queries and **sse-proxy `/events`** — key on this attribute to attribute an
 event to its composition. Absence of the attribute means "not resolvable to a composition" (no
 label, unmapped kind, GET failure, or a non-K8s-event record) — it is never an error in the stream.

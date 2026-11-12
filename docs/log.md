@@ -11,13 +11,38 @@ timestamp: 2026-08-07T00:00:00Z
 
 Curated history, newest first. Release notes live in GitHub Releases.
 
-## 2026-11-05
+## 2026-11-12
 - Dependency update under collector core v0.118.0: grpc v1.83.2, OTel Go SDK v1.47.0, clickhouse-go
   v2.34.0, x/net v0.62.0, Go 1.26. Vendored `go.opentelemetry.io/contrib/config` as `contribconfig/`
   with a one-line patch, because the SDK bump otherwise exits at startup
   ([api.md](./api.md#fork-contribconfig)). Dropped the `go.mod` `replace` directives into
   `../../` paths that do not exist in this repo: they made `go mod download` fail, which turned
   `security / go` red for both forks on main.
+
+## 2026-11-10
+- `compositionresolver` also stamps `krateo.io/composition-name` and
+  `krateo.io/composition-namespace` next to the id (new keys `name_label_key`,
+  `namespace_label_key`; empty disables). They come from the same source as the id: the
+  involvedObject's labels, or a root composition's own metadata. Compositions are named at the
+  source, so the portal's events bell can link to `/compositions/<ns>/<name>` without listing
+  every composition kind to map an id to a name. On krateo-057 every live object carrying a
+  composition-id label also carries both labels.
+
+## 2026-11-08
+- Added `filterprocessor` so the `otel-collector-deployment` chart can drop `k8s.container.ready` for
+  Job-owned pods. A completed Job's pod reads not-ready for as long as the pod object exists, which
+  would fire a per-pod "not Ready" alert on every finished CronJob run (observability, per-pod
+  readiness alert). The chart finds Job ownership with a narrow `k8sattributes` instance that adds
+  only `k8s.job.name`.
+
+## 2026-11-05
+- Added `.github/workflows/test.yaml`, which runs `clickhouseexporter` and `compositionresolver`
+  with `-race` and a floor on the number of tests run. Until now no workflow ran `go test`, so a
+  green commit meant the code had not been tested, and the installer's pin gate refused 1.0.5.
+- Added `transformprocessor` so the `otel-collector-deployment` chart can redact JWTs on the
+  `k8sobjects` logs pipeline (#29, installer#394). Bodies from that receiver are nested maps,
+  which `replace_pattern(body, ...)` leaves untouched, so the chart must target `body.string`.
+  That accessor only converts a record to a string when the pattern matches.
 
 ## 2026-08-07
 - Adopted the Krateo Documentation Standard (this bundle). The former

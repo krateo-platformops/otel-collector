@@ -1,0 +1,70 @@
+name: test
+
+# Runs this repo's Go tests. Until now nothing did: the workflows were release-notes,
+# release-tag, security and docs lint, and none of them invokes `go test`, so tests in the
+# tree went unrun and a green commit meant the code had not been tested. The installer's
+# pin gate refused otel-collector 1.0.5 for exactly that reason.
+#
+# k8sobjectsreceiver is not in the matrix because it has no test files, and a job there would
+# pass having tested nothing. Add it when it gains tests. clickhouseexporter's integration
+# tests also stay out: they sit behind the `integration` build tag and need a real ClickHouse.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: go test (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor is set from a measured healthy run, not derived from source. A suite that
+        # compiles and runs zero tests passes vacuously, so raise a floor when its suite grows.
+        include:
+          - module: clickhouseexporter
+            observed: 131
+            floor: 110
+          - module: compositionresolver
+            observed: 19
+            floor: 16
+    defaults:
+      run:
+        working-directory: ${{ matrix.module }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          # Keep equal to the Dockerfile's builder, so tests run on the toolchain that ships.
+          go-version: "1.25"
+          cache-dependency-path: ${{ matrix.module }}/go.sum
+
+      - name: go vet
+        run: go vet ./...
+
+      # -count=1 defeats the test cache, because a cached PASS is not evidence about this
+      # commit. -v gives the `=== RUN` lines the floor below counts.
+      - name: go test (race)
+        run: |
+          set -euo pipefail
+          go test ./... -race -count=1 -v 2>&1 | tee /tmp/go-test.log
+
+      - name: Assert the suite actually ran tests
+        run: |
+          set -euo pipefail
+          count=$(grep -c '^=== RUN' /tmp/go-test.log || true)
+          echo "tests run: $count (observed healthy run: ${{ matrix.observed }})"
+          if [ "$count" -lt ${{ matrix.floor }} ]; then
+            echo "::error::only $count tests ran, floor is ${{ matrix.floor }}"
+            exit 1
+          fi
