@@ -1,6 +1,6 @@
 module github.com/krateo-platformops/otel-collector/compositionresolver
 
-go 1.26.10
+go 1.26.11
 
 require (
 	go.opentelemetry.io/collector/component v0.118.0

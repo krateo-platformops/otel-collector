@@ -18,6 +18,11 @@ Curated history, newest first. Release notes live in GitHub Releases.
   ([api.md](./api.md#fork-contribconfig)). Dropped the `go.mod` `replace` directives into
   `../../` paths that do not exist in this repo: they made `go mod download` fail, which turned
   `security / go` red for both forks on main.
+- Cleared the findings `govulncheck` reported on the rebased build: Go 1.26.11 (GO-2026-6859),
+  klauspost/compress v1.20.4 (GO-2026-6865) and andybalholm/brotli v1.2.8 (GO-2026-6888), all
+  published after 2026-11-05, plus expr v1.17.8 and xpath v1.3.9, which `transformprocessor` and
+  `filterprocessor` pull in through contrib `pkg/ottl` and `internal/filter`. No local module
+  imports expr or xpath, so their floors sit in `replaces:` in `builder-config.yaml`.
 
 ## 2026-11-10
 - `compositionresolver` also stamps `krateo.io/composition-name` and
