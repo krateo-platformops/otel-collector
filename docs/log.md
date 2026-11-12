@@ -11,6 +11,19 @@ timestamp: 2026-08-07T00:00:00Z
 
 Curated history, newest first. Release notes live in GitHub Releases.
 
+## 2026-11-12
+- Dependency update under collector core v0.118.0: grpc v1.83.2, OTel Go SDK v1.47.0, clickhouse-go
+  v2.34.0, x/net v0.62.0, Go 1.26. Vendored `go.opentelemetry.io/contrib/config` as `contribconfig/`
+  with a one-line patch, because the SDK bump otherwise exits at startup
+  ([api.md](./api.md#fork-contribconfig)). Dropped the `go.mod` `replace` directives into
+  `../../` paths that do not exist in this repo: they made `go mod download` fail, which turned
+  `security / go` red for both forks on main.
+- Cleared the findings `govulncheck` reported on the rebased build: Go 1.26.11 (GO-2026-6859),
+  klauspost/compress v1.20.4 (GO-2026-6865) and andybalholm/brotli v1.2.8 (GO-2026-6888), all
+  published after 2026-11-05, plus expr v1.17.8 and xpath v1.3.9, which `transformprocessor` and
+  `filterprocessor` pull in through contrib `pkg/ottl` and `internal/filter`. No local module
+  imports expr or xpath, so their floors sit in `replaces:` in `builder-config.yaml`.
+
 ## 2026-11-10
 - `compositionresolver` also stamps `krateo.io/composition-name` and
   `krateo.io/composition-namespace` next to the id (new keys `name_label_key`,

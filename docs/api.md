@@ -98,12 +98,28 @@ manually restarted.
 
 Everything else (SQL, models, config, factory) is identical to upstream v0.118.0.
 
+### <a name="fork-contribconfig"></a>`contribconfig/` — startup with a current OTel Go SDK
+
+`go.opentelemetry.io/contrib/config` v0.10.0 is the version collector core v0.118.0 compiles
+against; v0.11.0 and later change the types `service/telemetry` uses, so it cannot simply be
+bumped. Its `newResource` merges `resource.Default()` with a resource carrying the schema URL core
+passes in (semconv 1.26.0). `otel/sdk` moved `Default()` to a newer semconv at v1.37.0, so
+`resource.Merge` returns `conflicting Schema URL` and the collector exits at startup. That blocks
+every `otel/sdk` security fix from v1.40.0 on, and grpc v1.83.2 itself requires `otel/sdk` v1.44.0.
+
+**The patch** (`contribconfig/resource.go`, one line): the second resource is built with
+`resource.NewSchemaless`, so the merged resource takes the schema URL from `Default()`. The merged
+attributes are unchanged. `resource_test.go` is the regression guard. Only the non-test sources of
+upstream are vendored, and everything else is identical to upstream v0.10.0 apart from `go.mod`.
+
 ### Exit criteria for the forks
 
 - `clickhouseexporter`: an upstream PR is pending (the fix needs re-implementation on
   upstream's refactored `driver.Conn` main). When it merges and releases: delete the
   vendored dir, drop the `path:` override, bump the `gomod` version
-  (`builder-config.yaml:29-33` records this contract).
+  (`builder-config.yaml:30-34` records this contract).
+- `contribconfig`: delete the dir and its `replaces:` entry on the first collector core bump;
+  newer core versions do not use this module.
 - `k8sobjectsreceiver`: same shape — the recycle/restart patch is upstream-able; until then
   the vendored copy must be re-diffed against upstream on every version bump (the whole
   v0.118.0 set moves as one unit — see gotcha 8 in

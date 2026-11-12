@@ -79,6 +79,11 @@ break the OCB build (collector API drift between minor versions) — and any bum
 **re-diffing both forks** against the new upstream and re-applying the patches
 ([api.md](../api.md) records the exact deltas). Treat the version set as one unit.
 
+The OTel Go SDK is not part of that set and can move ahead of it, but only through `contribconfig/`
+and the `replaces:` block in `builder-config.yaml`. A clean build proves nothing here: the SDK bump
+compiled and passed every module test while the binary exited at startup with `conflicting Schema
+URL`. After any SDK bump, start the built collector.
+
 ## 9. The `gomod` versions for the local-path components are placeholders
 
 The custom processor's module in `builder-config.yaml:23` is

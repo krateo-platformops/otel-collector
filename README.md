@@ -9,7 +9,7 @@ A **source repo** (image, no charts): the OTel Collector Builder assembles `otel
 `builder-config.yaml` — upstream contrib components plus the custom `compositionresolver`
 processor (stamps `krateo.io/composition-id`, and the composition's name and namespace, on K8s-event log records) and two patched forks,
 `k8sobjectsreceiver` (watch-stall recovery) and `clickhouseexporter` (schema recreation on
-`UNKNOWN_TABLE`). Deployed by the `otel-collector-deployment` chart in
+`UNKNOWN_TABLE`), plus a patched `contrib/config` library (`contribconfig`). Deployed by the `otel-collector-deployment` chart in
 [`clickstack-chart`](https://github.com/krateo-platformops/clickstack-chart).
 Full picture: [docs/index.md](docs/index.md).
 
