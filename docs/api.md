@@ -59,14 +59,20 @@ result channel **stopped** the watch permanently (`return true` from the watch l
 
 **Delta (all in `receiver.go`; every hunk is marked `// krateo patch:`):**
 
-1. New constant `watchRecycleInterval = 10 * time.Minute` (`receiver.go:30-33`) — not
-   configurable.
-2. The watch loop arms a recycle timer (`receiver.go:212-213`); when it fires, the watch is
-   proactively re-established (`case <-recycle.C:` → `return false`, `receiver.go:218-220`).
+1. New constant `watchRecycleInterval = 10 * time.Minute` — not configurable.
+2. The watch loop arms a recycle timer; when it fires, the watch is proactively re-established
+   (`case <-recycle.C:`).
 3. On the result channel closing, the receiver now **re-establishes** the watch instead of
    stopping it: upstream's `Warn("Watch channel closed unexpectedly") + return true` becomes
-   `Warn("watch channel closed, re-establishing watch") + return false`
-   (`receiver.go:233-236`).
+   `Warn("watch channel closed, re-establishing watch")` and a restart.
+4. **The watch never stops by itself.** Restarting it needs a list, and upstream ended the loop
+   (`cancel()`) when that list failed, which is what an API server restart causes. Failures are now
+   retried, waiting 1 s to 30 s, until shutdown, and an error is logged for each. A watch that ends
+   within 30 s of starting also waits, where upstream listed again at once. Hunk 2 made the old
+   behaviour more likely to bite, because it adds a list every 10 minutes.
+
+Events created while there is no watch are not collected: a restart begins at the list's
+`resourceVersion`. The tests are in `receiver_restart_test.go`.
 
 Everything else (config surface, `unstructured_to_logdata.go`, factory) is byte-identical to
 upstream v0.118.0.

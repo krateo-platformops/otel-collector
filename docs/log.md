@@ -11,6 +11,13 @@ timestamp: 2026-08-07T00:00:00Z
 
 Curated history, newest first. Release notes live in GitHub Releases.
 
+## 2026-11-24
+- `k8sobjectsreceiver` no longer stops for good when one list fails. Restarting a watch lists first, and
+  upstream v0.118.0 ended the loop on that list's error, so an API server restart at the wrong moment
+  ended event collection until the pod was replaced, with the pod Ready and its last line
+  `could not retrieve a resourceVersion`. Seen on a test cluster: 20 minutes without events. The fork's
+  own 10-minute recycle adds a list, so it made this more likely. Every image since the fork has it.
+
 ## 2026-11-12
 - Dependency update under collector core v0.118.0: grpc v1.83.2, OTel Go SDK v1.47.0, clickhouse-go
   v2.34.0, x/net v0.62.0, Go 1.26. Vendored `go.opentelemetry.io/contrib/config` as `contribconfig/`
