@@ -44,7 +44,7 @@ The chart's default runtime config sets exactly the defaults above (visible in t
 The two vendored forks add **no** configuration keys over upstream v0.118.0:
 
 - `k8sobjectsreceiver`: the watch-recycle interval is a compile-time constant
-  (`watchRecycleInterval = 10 * time.Minute`, `k8sobjectsreceiver/receiver.go:33`) — it is
+  (`watchRecycleInterval = 10 * time.Minute`) — it is
   **not** tunable from the collector config.
 - `clickhouseexporter`: the schema-recreate-and-retry path is gated by the **existing**
   upstream `create_schema` option (`shouldCreateSchema()`,

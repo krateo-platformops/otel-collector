@@ -18,7 +18,6 @@ import (
 	"go.uber.org/zap"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	apiWatch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
@@ -31,6 +30,13 @@ import (
 // re-established. krateo patch: guards against a watch connection that goes silently dead
 // (no error, no channel close) and would otherwise hang the receiver indefinitely.
 const watchRecycleInterval = 10 * time.Minute
+
+// How long to wait before a failed list or watch is tried again: doubling from the first to the second.
+// krateo patch; variables for the tests.
+var (
+	watchRetryInitial = time.Second
+	watchRetryMax     = 30 * time.Second
+)
 
 type k8sobjectsreceiver struct {
 	setting         receiver.Settings
@@ -175,33 +181,53 @@ func (kr *k8sobjectsreceiver) startWatch(ctx context.Context, config *K8sObjects
 		return resource.Watch(ctx, options)
 	}
 
-	cancelCtx, cancel := context.WithCancel(ctx)
+	// krateo patch: the watch never stops by itself. A list or watch that fails is retried with a
+	// backoff until the receiver shuts down: an API server that is restarting fails exactly the list
+	// that should restart the watch, and returning there ended the event stream for the pod's life.
 	cfgCopy := *config
-	wait.UntilWithContext(cancelCtx, func(newCtx context.Context) {
-		resourceVersion, err := getResourceVersion(newCtx, &cfgCopy, resource)
-		if err != nil {
-			kr.setting.Logger.Error("could not retrieve a resourceVersion", zap.String("resource", cfgCopy.gvr.String()), zap.Error(err))
-			cancel()
+	retry := time.Duration(0) // no wait after a watch that lived, so nothing is added to what it misses
+	for {
+		started := time.Now()
+		resourceVersion, err := getResourceVersion(ctx, &cfgCopy, resource)
+		what := "could not retrieve a resourceVersion, retrying"
+		if err == nil {
+			var done bool
+			if done, err = kr.doWatch(ctx, &cfgCopy, resourceVersion, watchFunc, stopperChan); done {
+				return
+			}
+			what = "error in watching object, retrying"
+		}
+		if ctx.Err() != nil {
 			return
 		}
-
-		done := kr.doWatch(newCtx, &cfgCopy, resourceVersion, watchFunc, stopperChan)
-		if done {
-			cancel()
-			return
+		if err != nil {
+			kr.setting.Logger.Error(what, zap.String("resource", cfgCopy.gvr.String()), zap.Error(err))
 		}
 
 		// need to restart with a fresh resource version
 		cfgCopy.ResourceVersion = ""
-	}, 0)
+
+		if err == nil && time.Since(started) > watchRetryMax {
+			retry = 0
+			continue
+		}
+		retry = min(max(2*retry, watchRetryInitial), watchRetryMax)
+		select {
+		case <-ctx.Done():
+			return
+		case <-stopperChan:
+			return
+		case <-time.After(retry):
+		}
+	}
 }
 
-// doWatch returns true when watching is done, false when watching should be restarted.
-func (kr *k8sobjectsreceiver) doWatch(ctx context.Context, config *K8sObjectsConfig, resourceVersion string, watchFunc func(options metav1.ListOptions) (apiWatch.Interface, error), stopperChan chan struct{}) bool {
+// doWatch returns true when watching is done (the receiver is stopping), false when watching should be
+// restarted, with the error when it could not start at all.
+func (kr *k8sobjectsreceiver) doWatch(ctx context.Context, config *K8sObjectsConfig, resourceVersion string, watchFunc func(options metav1.ListOptions) (apiWatch.Interface, error), stopperChan chan struct{}) (bool, error) {
 	watcher, err := watch.NewRetryWatcher(resourceVersion, &cache.ListWatch{WatchFunc: watchFunc})
 	if err != nil {
-		kr.setting.Logger.Error("error in watching object", zap.String("resource", config.gvr.String()), zap.Error(err))
-		return true
+		return false, err
 	}
 
 	defer watcher.Stop()
@@ -217,7 +243,7 @@ func (kr *k8sobjectsreceiver) doWatch(ctx context.Context, config *K8sObjectsCon
 		select {
 		case <-recycle.C:
 			kr.setting.Logger.Debug("watch recycle interval elapsed, re-establishing watch", zap.String("resource", config.gvr.String()))
-			return false
+			return false, nil
 		case data, ok := <-res:
 			if data.Type == apiWatch.Error {
 				errObject := apierrors.FromObject(data.Object)
@@ -225,7 +251,7 @@ func (kr *k8sobjectsreceiver) doWatch(ctx context.Context, config *K8sObjectsCon
 				if errObject.(*apierrors.StatusError).ErrStatus.Code == http.StatusGone {
 					kr.setting.Logger.Info("received a 410, grabbing new resource version", zap.Any("data", data))
 					// we received a 410 so we need to restart
-					return false
+					return false, nil
 				}
 			}
 
@@ -233,7 +259,7 @@ func (kr *k8sobjectsreceiver) doWatch(ctx context.Context, config *K8sObjectsCon
 				// krateo patch: a closed channel means the watch ended; re-establish it
 				// (restart) instead of stopping the receiver permanently.
 				kr.setting.Logger.Warn("watch channel closed, re-establishing watch", zap.String("resource", config.gvr.String()))
-				return false
+				return false, nil
 			}
 
 			if config.exclude[data.Type] {
@@ -251,7 +277,7 @@ func (kr *k8sobjectsreceiver) doWatch(ctx context.Context, config *K8sObjectsCon
 			}
 		case <-stopperChan:
 			watcher.Stop()
-			return true
+			return true, nil
 		}
 	}
 }
